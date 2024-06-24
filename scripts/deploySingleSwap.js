@@ -8,7 +8,10 @@ import {
 } from '../utils.js';
 
 console.log('account: ', account);
-console.log('base universal router address: ', SWAP_ROUTER_02_ADDRESSES(8453));
+console.log(
+  'uniswap base universal router address: ',
+  SWAP_ROUTER_02_ADDRESSES(8453)
+);
 
 const hash = await walletClient.deployContract({
   abi: swapAbi,

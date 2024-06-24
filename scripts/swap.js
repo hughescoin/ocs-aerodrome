@@ -67,17 +67,17 @@ async function main() {
   const amountIn = parseUnits('1', 6); // 1 TOKEN // USDC uses 6 decimals
   const minAmountOut = parseUnits('0.9', 18); // Minimum amount of WETH
 
-  const commands = toHex(toBytes('V2_SWAP_EXACT_IN'));
+  const commands = toHex(0);
 
-  const inputs = toHex(
+  const inputs = [
     toBytes([
       account,
       amountIn,
       minAmountOut,
       [TOKEN_ADDRESS, WETH_ADDRESS],
       account,
-    ])
-  );
+    ]),
+  ];
 
   // Execute the swap
   const tx = await router.write.execute([commands, inputs]);
