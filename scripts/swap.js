@@ -6,8 +6,10 @@ import {
   weth9Abi,
   daiAbi,
   publicClient,
+  permit2Abi,
+  approveTokensToRouter,
 } from '../utils.js';
-import { parseUnits, toHex, getContract, toBytes } from 'viem';
+import { parseUnits, toHex, getContract, toBytes, boolToHex, size } from 'viem';
 import { ethers } from 'ethers';
 
 // Replace with actual contract ABIs and addresses
@@ -27,6 +29,18 @@ function toHexAddress(address) {
   }
   return ethers.getAddress(address);
 }
+
+const permitSingle = {
+  spender: '',
+  sigDeadline: '',
+};
+
+const permitDetails = {
+  address: '',
+  amount: '',
+  expiration: '',
+  nonce: '',
+};
 
 async function main() {
   // Get signer (e.g., account)
@@ -49,6 +63,11 @@ async function main() {
     client: walletClient,
   });
 
+  const permit2 = getContract({
+    address: toHexAddress(process.env.PERMIT2_BASE),
+    abi: permit2Abi,
+    client: walletClient,
+  });
   const token = getContract({
     address: toHexAddress(TOKEN_ADDRESS),
     abi: TOKEN_ABI,
@@ -67,73 +86,37 @@ async function main() {
     client: walletClient,
   });
 
-  // Approve tokens
   const MAX_UINT = BigInt(2) ** BigInt(256) - BigInt(1);
+  const MAX_UINT48 = (BigInt(1) << BigInt(48)) - BigInt(1);
+  const MAX_UINT160 = (BigInt(1) << BigInt(160)) - BigInt(1);
 
-  // try {
-  //   const spender = router.address; //SwapContract Address
-  //   const value = parseUnits('.5', 6);
+  // Approve tokens
+  const value = parseUnits('1', 6);
 
-  //   console.log({
-  //     spender: spender,
-  //     usdcAmount: value,
-  //   });
+  await approveTokensToRouter(router, token, value);
 
-  //   const hash = await token.write.approve([spender, value]);
-  //   console.log('tx successful: ', hash);
-  //   const approveReceipt = await publicClient.waitForTransactionReceipt({
-  //     hash: hash,
-  //   });
-  //   console.log('approval receipt: ', approveReceipt);
+  // V2_SWAP_EXACT_IN
 
-  //   const transferHash = await token.write.transfer([spender, value]);
-  //   console.log('Transfer USDC complete: ', transferHash);
-
-  //   const transferReceipt = await publicClient.waitForTransactionReceipt({
-  //     hash: transferHash,
-  //   });
-  //   console.log('usdc transfer receipt: ', transferReceipt);
-  // } catch (error) {
-  //   console.log('Error attempting to approve token: ', error);
-  // }
-
-  // const tokenApprovalTx = await token.write.approve([router.address, MAX_UINT]);
-  // const tokenApprovalReceipt = await publicClient.waitForTransactionReceipt({
-  //   hash: tokenApprovalTx,
-  // });
-  // console.log(
-  //   'Token approval transaction mined:',
-  //   tokenApprovalReceipt.blockHash
-  // );
-
-  // const daiApprovalTx = await dai.write.approve([router.address, MAX_UINT]);
-  // const daiApprovalReceipt = await publicClient.waitForTransactionReceipt({
-  //   hash: daiApprovalTx,
-  // });
-  // console.log('DAI approval transaction mined:', daiApprovalReceipt.blockHash);
-
-  // Define the swap parameters
-  const amountIn = parseUnits('1', 6); // 1 TOKEN // USDC uses 6 decimals
-  const minAmountOut = parseUnits('0.3', 18); // Minimum amount of DAI
-
-  // V2_SWAP_EXACT_OUT simple --> 0x09
-
-  const commands = toHex(toBytes(9)); // 0x09
+  const commands = toHex(toBytes(8));
   console.log('commands: ', commands);
   console.log('length of command : ', commands.length);
 
-  // Define the path object
-  const route = {
-    from: toHexAddress(TOKEN_ADDRESS),
-    to: toHexAddress(DAI_ADDRESS),
-    stable: false,
-  };
+  // Define the swap parameters
+  const amountIn = parseUnits('1', 6); // 1 TOKEN // USDC uses 6 decimals
+  const minAmountOut = parseUnits('0.9895', 18); // Minimum amount of DAI
 
-  console.log('path:', route);
+  // Define the path
 
-  // Create an array of path objects
-  const routes = [route];
-  console.log('paths: ', routes);
+  const path = [
+    toHexAddress(TOKEN_ADDRESS),
+    toHexAddress(DAI_ADDRESS),
+    //toHexAddress(boolToHex(true, { size: 20 }).toString()),
+  ];
+
+  console.log('path:', path);
+  console.log(
+    `USDC Input: ${BigInt(amountIn)} \n Min DAI output: ${minAmountOut}`
+  );
 
   // Manually encode the parameters
   const swapInputs = ethers.AbiCoder.defaultAbiCoder().encode(
@@ -141,14 +124,13 @@ async function main() {
       'address', // Constants.MSG_SENDER
       'uint256', // AMOUNT
       'uint256', // type(uint256).max
-      'tuple(address from, address to, bool stable)[]', // routes
+      'address[]', // path
       'bool', // true
     ],
-    [account, minAmountOut, MAX_UINT, routes, false]
+    [account, BigInt(amountIn), BigInt(0), path, true]
   );
-  let inputs = [];
-  inputs[0] = swapInputs;
 
+  const inputs = [swapInputs];
   console.log('inputs: ', inputs);
 
   // Execute the swap
@@ -157,8 +139,7 @@ async function main() {
     const executeReceipt = await publicClient.waitForTransactionReceipt({
       hash: tx,
     });
-    console.log('swap executed:', executeReceipt.blockHash);
-    console.log('Swap executed successfully');
+    console.log('Swap executed successfully: ', executeReceipt.blockHash);
   } catch (executeError) {
     console.error('Error executing swap: ', executeError);
   }
