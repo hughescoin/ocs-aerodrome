@@ -110,7 +110,7 @@ async function main() {
   const path = [
     toHexAddress(TOKEN_ADDRESS),
     toHexAddress(DAI_ADDRESS),
-    //toHexAddress(boolToHex(true, { size: 20 }).toString()),
+    toHexAddress(boolToHex(false, { size: 20 }).toString()),
   ];
 
   console.log('path:', path);
